@@ -66,7 +66,6 @@ class Application(Frame):
     pt = decrypt(pw, ct)
     if pt is None:
       return
-    print(pt)
     self.plaintext.delete("1.0", "end")
     self.plaintext.insert("1.0", pt)
 
