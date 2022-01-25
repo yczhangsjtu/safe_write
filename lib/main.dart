@@ -1,10 +1,10 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:hash/hash.dart';
+import 'package:convert/convert.dart';
 import 'package:flutter_document_picker/flutter_document_picker.dart';
 import 'settings.dart';
 import 'passage.dart';
@@ -56,7 +56,7 @@ class _SafeReader extends StatefulWidget {
       String contents = await file.readAsString();
       return Settings.fromJson(json.decode(contents));
     } catch (e) {
-      return Settings([], {}, {});
+      return Settings([], {}, {}, {});
     }
   }
 
@@ -67,7 +67,7 @@ class _SafeReader extends StatefulWidget {
 }
 
 class _SafeReaderState extends State<_SafeReader> {
-  Settings settings = Settings([], {}, {});
+  Settings settings = Settings([], {}, {}, {});
 
   @override
   void initState() {
@@ -82,58 +82,65 @@ class _SafeReaderState extends State<_SafeReader> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text("Files")),
-      body: ListView.builder(
-          itemCount: settings.files.length + 1,
-          itemBuilder: (context, index) {
-            if (index < settings.files.length) {
-              final path = settings.files[index];
-              return GestureDetector(
-                onTap: () async {
-                  final file = File(path);
-                  final s = await file.readAsString();
-                  Navigator.push(context, MaterialPageRoute(builder: (context) {
-                    return _LockedReader(
-                      path: settings.files[index],
-                      ciphertext: s,
-                      name: basenameWithoutExtension(settings.files[index]),
-                      locations: settings.locations,
-                      chapters: settings.passages,
-                      onWrite: () {
-                        widget.write(settings);
-                      },
-                    );
-                  }));
-                },
-                child: ListTile(
-                  title: Text(basenameWithoutExtension(path)),
-                  subtitle: Text(path),
-                  trailing: IconButton(
-                      iconSize: 14,
-                      onPressed: () {
-                        settings.files.removeAt(index);
-                        widget.write(settings);
-                        setState(() {});
-                      },
-                      icon: Icon(Icons.delete)),
-                ),
-              );
-            } else
-              return Container(
-                  height: 30,
-                  child: Center(
-                      child: IconButton(
-                          color: Colors.blue,
-                          icon: Icon(Icons.add),
-                          onPressed: () async {
-                            final path =
-                                await FlutterDocumentPicker.openDocument();
-                            if (path == null) return;
-                            setState(() {
-                              settings.files.add(path);
-                              widget.write(settings);
-                            });
-                          })));
-          }),
+      backgroundColor: Colors.black,
+      body: DefaultTextStyle(
+        style: TextStyle(color: Colors.white),
+        child: ListView.builder(
+            itemCount: settings.files.length + 1,
+            itemBuilder: (context, index) {
+              if (index < settings.files.length) {
+                final path = settings.files[index];
+                return GestureDetector(
+                  onTap: () async {
+                    final file = File(path);
+                    final s = await file.readAsString();
+                    Navigator.push(context,
+                        MaterialPageRoute(builder: (context) {
+                      return _LockedReader(
+                        path: settings.files[index],
+                        ciphertext: s,
+                        name: basenameWithoutExtension(settings.files[index]),
+                        locations: settings.locations,
+                        pageBreaks: settings.pageBreaks,
+                        chapters: settings.passages,
+                        onWrite: () {
+                          widget.write(settings);
+                        },
+                      );
+                    }));
+                  },
+                  child: ListTile(
+                    title: Text(basenameWithoutExtension(path),
+                        style: TextStyle(color: Colors.white)),
+                    subtitle: Text(path, style: TextStyle(color: Colors.white)),
+                    trailing: IconButton(
+                        iconSize: 14,
+                        onPressed: () {
+                          settings.files.removeAt(index);
+                          widget.write(settings);
+                          setState(() {});
+                        },
+                        icon: Icon(Icons.delete, color: Colors.white)),
+                  ),
+                );
+              } else
+                return Container(
+                    height: 30,
+                    child: Center(
+                        child: IconButton(
+                            color: Colors.blue,
+                            icon: Icon(Icons.add),
+                            onPressed: () async {
+                              final path =
+                                  await FlutterDocumentPicker.openDocument();
+                              if (path == null) return;
+                              setState(() {
+                                settings.files.add(path);
+                                widget.write(settings);
+                              });
+                            })));
+            }),
+      ),
     );
   }
 }
@@ -143,6 +150,7 @@ class _LockedReader extends StatefulWidget {
   final String ciphertext;
   final String name;
   final Map<String, int> locations;
+  final Map<String, List<int>> pageBreaks;
   final Map<String, int> chapters;
   final VoidCallback onWrite;
 
@@ -152,6 +160,7 @@ class _LockedReader extends StatefulWidget {
       required this.ciphertext,
       required this.name,
       required this.locations,
+      required this.pageBreaks,
       required this.chapters,
       required this.onWrite})
       : super(key: key);
@@ -184,18 +193,20 @@ class _LockedReaderState extends State<_LockedReader> {
   @override
   Widget build(BuildContext context) {
     return Material(
+      color: Colors.black,
       child: Center(
           child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Icon(Icons.lock, color: Colors.blue, size: 32),
-          Text(widget.name),
+          Text(widget.name, style: TextStyle(color: Colors.white)),
           Container(
               width: 300,
               child: TextField(
                 controller: _passwordController,
                 obscureText: true,
+                style: TextStyle(color: Colors.white),
                 decoration: InputDecoration(
                   border: OutlineInputBorder(),
                   hintText: "Password",
@@ -219,6 +230,7 @@ class _LockedReaderState extends State<_LockedReader> {
                   path: widget.path,
                   plaintext: plaintext,
                   locations: widget.locations,
+                  pageBreaks: widget.pageBreaks,
                   passages: widget.chapters,
                   onWrite: widget.onWrite,
                   width: MediaQuery.of(context).size.width,
@@ -237,9 +249,10 @@ class _Reader extends StatefulWidget {
   final String path;
   final Plaintext plaintext;
   final Map<String, int> locations;
+  final Map<String, List<int>> pageBreaks;
   final Map<String, int> passages;
   final VoidCallback onWrite;
-  final TextStyle _style = TextStyle(fontSize: 18);
+  final TextStyle _style = TextStyle(fontSize: 18, color: Colors.white);
   final double width;
   final double height;
   final double textWidth;
@@ -251,6 +264,7 @@ class _Reader extends StatefulWidget {
       required this.path,
       required this.plaintext,
       required this.locations,
+      required this.pageBreaks,
       required this.passages,
       required this.onWrite,
       required this.width,
@@ -291,7 +305,18 @@ class _ReaderState extends State<_Reader> {
     super.initState();
     for (int i = 0; i < widget.plaintext.passages.length; i++) {
       _runes.add(widget.plaintext.passages[i].content.runes.toList());
-      _pageStartPositions.add(_breakPages(_runes[i]));
+      var md5 =
+          MD5().update(widget.plaintext.passages[i].content.codeUnits).digest();
+      String key = hex.encode(md5);
+      List<int>? pageBreaks;
+      if (widget.pageBreaks.containsKey(key)) {
+        pageBreaks = widget.pageBreaks[key];
+      } else {
+        pageBreaks = _breakPages(_runes[i]);
+        widget.pageBreaks[key] = pageBreaks;
+        widget.onWrite();
+      }
+      _pageStartPositions.add(pageBreaks!);
     }
     _pageIndices = [];
     _passage = widget.passages[widget.path] ?? 0;
@@ -347,9 +372,9 @@ class _ReaderState extends State<_Reader> {
 
   int _nextPageBreak(List<int> text, int start) {
     int i = start;
-    for(int j = 0; j < widget.textHeight ~/ 30; j++) {
+    for (int j = 0; j < widget.textHeight ~/ 30; j++) {
       i = _nextLineBreak(text, i);
-      if(i >= text.length) {
+      if (i >= text.length) {
         break;
       }
     }
@@ -393,6 +418,7 @@ class _ReaderState extends State<_Reader> {
     return Material(
         child: Stack(
       children: [
+        Container(color: Colors.black),
         Center(
           child: Container(
               width: widget.textWidth,
@@ -417,7 +443,7 @@ class _ReaderState extends State<_Reader> {
               },
               child: Container(
                   width: widget.width / 4,
-                  color: Colors.blue.withAlpha(20),
+                  color: Colors.white.withAlpha(0),
                   height: widget.height),
             ),
             GestureDetector(
@@ -446,7 +472,7 @@ class _ReaderState extends State<_Reader> {
               },
               child: Container(
                   width: widget.width / 2,
-                  color: Colors.blue.withAlpha(20),
+                  color: Colors.white.withAlpha(0),
                   height: widget.height),
             ),
             GestureDetector(
@@ -461,7 +487,7 @@ class _ReaderState extends State<_Reader> {
               },
               child: Container(
                   width: widget.width / 4,
-                  color: Colors.blue.withAlpha(20),
+                  color: Colors.white.withAlpha(0),
                   height: widget.height),
             ),
           ],
@@ -526,101 +552,112 @@ class _ProgressControllerState extends State<_ProgressController> {
     final dropdownMenuItems = <DropdownMenuItem<int>>[];
     for (int i = 0; i < widget.plaintext.passages.length; i++) {
       dropdownMenuItems.add(DropdownMenuItem(
-          child: Text(widget.plaintext.passages[i].title), value: i));
+          child: Container(
+            color: Colors.black,
+            child: Text(widget.plaintext.passages[i].title,
+                style: TextStyle(color: Colors.white)),
+          ),
+          value: i));
     }
     return Scaffold(
       appBar: AppBar(title: Text("Progress")),
-      body: Padding(
+      backgroundColor: Colors.black,
+      body: Container(
         padding: const EdgeInsets.all(8.0),
-        child: Container(
-          padding: EdgeInsets.only(left: 20, right: 20, top: 100),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Expanded(
-                    child: Text("Passage:",
-                        style: TextStyle(fontWeight: FontWeight.bold)),
-                  ),
-                  DropdownButton(
-                    value: passage,
-                    items: dropdownMenuItems,
-                    onChanged: (value) {
-                      setState(() {
-                        passage = value as int;
-                        onChangePassage();
-                      });
-                      SchedulerBinding.instance
-                          ?.addPostFrameCallback((timeStamp) {
-                        _pageController?.text = (pageIndex + 1).toString();
-                      });
-                    },
-                  ),
-                ],
-              ),
-              Row(mainAxisSize: MainAxisSize.min, children: [
-                Expanded(
-                  child: Text("Page:",
-                      style: TextStyle(fontWeight: FontWeight.bold)),
-                ),
-                Counter(
-                    value: pageIndex,
-                    minValue: 0,
-                    maxValue: widget.maxPages[passage] - 1,
-                    controller: _pageController,
-                    onChange: (value, valid) {
-                      setState(() {
-                        if (valid) {
-                          pageIndex = value;
-                        }
-                        validNumber = valid;
-                      });
-                    }),
-                TextButton(
-                    onPressed: () {
-                      Navigator.push(context,
-                          MaterialPageRoute(builder: (context) {
-                        return _PositionSelector(
-                            initialValue:
-                                widget.pageLocation(passage, pageIndex) ?? 0,
-                            maxValue: widget.maxPositions[passage],
-                            onReturn: (value) {
-                              setState(() {
-                                pageIndex = widget.locatePage(passage, value) ??
-                                    pageIndex;
-                                _pageController?.text =
-                                    (pageIndex + 1).toString();
-                              });
-                            });
-                      }));
-                    },
-                    child: Text("From Position")),
-              ]),
-              Container(height: 30),
-              Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
+        child: DefaultTextStyle(
+          style: TextStyle(color: Colors.white),
+          child: Container(
+            padding: EdgeInsets.only(left: 20, right: 20, top: 100),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Expanded(child: Container()),
-                    OutlinedButton(
-                        onPressed: validNumber
-                            ? () {
-                                widget.pageIndices[passage] = pageIndex;
-                                widget.setPassage(passage);
-                                Navigator.of(context).pop();
-                              }
-                            : null,
-                        child: Text("OK")),
-                    OutlinedButton(
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                        },
-                        child: Text("Cancel")),
-                  ])
-            ],
+                    Expanded(
+                      child: Text("Passage:",
+                          style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                    DropdownButton(
+                      value: passage,
+                      dropdownColor: Colors.black,
+                      items: dropdownMenuItems,
+                      onChanged: (value) {
+                        setState(() {
+                          passage = value as int;
+                          onChangePassage();
+                        });
+                        SchedulerBinding.instance
+                            ?.addPostFrameCallback((timeStamp) {
+                          _pageController?.text = (pageIndex + 1).toString();
+                        });
+                      },
+                    ),
+                  ],
+                ),
+                Row(mainAxisSize: MainAxisSize.min, children: [
+                  Expanded(
+                    child: Text("Page:",
+                        style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                  Counter(
+                      value: pageIndex,
+                      minValue: 0,
+                      maxValue: widget.maxPages[passage] - 1,
+                      controller: _pageController,
+                      onChange: (value, valid) {
+                        setState(() {
+                          if (valid) {
+                            pageIndex = value;
+                          }
+                          validNumber = valid;
+                        });
+                      }),
+                  TextButton(
+                      onPressed: () {
+                        Navigator.push(context,
+                            MaterialPageRoute(builder: (context) {
+                          return _PositionSelector(
+                              initialValue:
+                                  widget.pageLocation(passage, pageIndex) ?? 0,
+                              maxValue: widget.maxPositions[passage],
+                              onReturn: (value) {
+                                setState(() {
+                                  pageIndex =
+                                      widget.locatePage(passage, value) ??
+                                          pageIndex;
+                                  _pageController?.text =
+                                      (pageIndex + 1).toString();
+                                });
+                              });
+                        }));
+                      },
+                      child: Text("From Position")),
+                ]),
+                Container(height: 30),
+                Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Expanded(child: Container()),
+                      OutlinedButton(
+                          onPressed: validNumber
+                              ? () {
+                                  widget.pageIndices[passage] = pageIndex;
+                                  widget.setPassage(passage);
+                                  Navigator.of(context).pop();
+                                }
+                              : null,
+                          child: Text("OK")),
+                      OutlinedButton(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                          },
+                          child: Text("Cancel")),
+                    ])
+              ],
+            ),
           ),
         ),
       ),
@@ -665,6 +702,7 @@ class _PositionSelectorState extends State<_PositionSelector> {
   @override
   Widget build(BuildContext context) {
     return Material(
+      color: Colors.black,
       child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -774,6 +812,7 @@ class _CounterState extends State<Counter> {
       IconButton(
           icon: Icon(Icons.horizontal_rule),
           iconSize: 20,
+          color: Colors.white,
           onPressed: () {
             setState(() {
               _value = max(widget.minValue, _value - 1);
@@ -785,6 +824,7 @@ class _CounterState extends State<Counter> {
           child: TextField(
             controller: _valueController,
             keyboardType: TextInputType.number,
+            style: TextStyle(color: Colors.white),
             inputFormatters: [
               FilteringTextInputFormatter.allow(RegExp(r"\d+"))
             ],
@@ -796,6 +836,7 @@ class _CounterState extends State<Counter> {
       IconButton(
           icon: Icon(Icons.add),
           iconSize: 20,
+          color: Colors.white,
           onPressed: () {
             setState(() {
               _value = min(widget.maxValue, _value + 1);
