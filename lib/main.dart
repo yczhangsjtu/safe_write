@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:hash/hash.dart';
 import 'package:convert/convert.dart';
 import 'package:flutter_document_picker/flutter_document_picker.dart';
+import 'package:safe_write/write_pad.dart';
 import 'settings.dart';
 import 'passage.dart';
 
@@ -81,7 +82,28 @@ class _SafeReaderState extends State<_SafeReader> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Files")),
+      appBar: AppBar(
+        title: Text("Files"),
+        actions: [
+          PopupMenuButton(
+              // add icon, by default "3 dot" icon
+              // icon: Icon(Icons.book)
+              itemBuilder: (context) {
+            return [
+              PopupMenuItem<int>(
+                value: 0,
+                child: Text("Secret Write"),
+              ),
+            ];
+          }, onSelected: (value) {
+            if (value == 0) {
+              Navigator.push(context, MaterialPageRoute(builder: (context) {
+                return WritingPad();
+              }));
+            }
+          }),
+        ],
+      ),
       backgroundColor: Colors.black,
       body: DefaultTextStyle(
         style: TextStyle(color: Colors.white),
