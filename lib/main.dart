@@ -45,6 +45,12 @@ class _SafeReader extends StatefulWidget {
     return File('$path/settings.json');
   }
 
+  Future<File> _passageFile(String path) async {
+    final localpath = await _localPath;
+    path = path.replaceAll("/", "_").replaceAll("\\", "_");
+    return File('$localpath/$path');
+  }
+
   Future<File?> write(Settings? settings) async {
     if (settings == null) return null;
     final file = await _localFile;
@@ -58,6 +64,20 @@ class _SafeReader extends StatefulWidget {
       return Settings.fromJson(json.decode(contents));
     } catch (e) {
       return Settings([], {}, {}, {});
+    }
+  }
+
+  Future<File?> writePassage(String path, String content) async {
+    final file = await _passageFile(path);
+    return file.writeAsString(content);
+  }
+
+  Future<String?> readPassage(String path) async {
+    try {
+      final file = await _passageFile(path);
+      return await file.readAsString();
+    } catch (e) {
+      return null;
     }
   }
 
@@ -114,8 +134,10 @@ class _SafeReaderState extends State<_SafeReader> {
                 final path = settings.files[index];
                 return GestureDetector(
                   onTap: () async {
-                    final file = File(path);
-                    final s = await file.readAsString();
+                    final s = await widget.readPassage(path);
+                    if (s == null) {
+                      return;
+                    }
                     Navigator.push(context,
                         MaterialPageRoute(builder: (context) {
                       return _LockedReader(
@@ -153,9 +175,16 @@ class _SafeReaderState extends State<_SafeReader> {
                             color: Colors.blue,
                             icon: Icon(Icons.add),
                             onPressed: () async {
+                              // This path is only a temporary path, not the
+                              // real path to the file. Should copy the content
+                              // of this file and store it in the space of this
+                              // app.
                               final path =
                                   await FlutterDocumentPicker.openDocument();
                               if (path == null) return;
+                              final file = File(path);
+                              final s = await file.readAsString();
+                              widget.writePassage(path, s);
                               setState(() {
                                 settings.files.add(path);
                                 widget.write(settings);
