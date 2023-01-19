@@ -640,7 +640,7 @@ class _ProgressControllerState extends State<_ProgressController> {
                           onChangePassage();
                         });
                         SchedulerBinding.instance
-                            ?.addPostFrameCallback((timeStamp) {
+                            .addPostFrameCallback((timeStamp) {
                           _pageController?.text = (pageIndex + 1).toString();
                         });
                       },
