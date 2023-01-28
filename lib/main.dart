@@ -312,7 +312,7 @@ class _Reader extends StatefulWidget {
 
   _Reader(
       {Key? key,
-      double padding = 100,
+      double padding = 50,
       required this.path,
       required this.plaintext,
       required this.locations,
@@ -383,7 +383,7 @@ class _ReaderState extends State<_Reader> {
 
   List<int> _breakPages(String text) {
     return getSplittedText(
-        Size(widget.textWidth, widget.textHeight), widget._style, text);
+        Size(widget.textWidth, widget.textHeight - 20), widget._style, text);
   }
 
   int? locatePage(int passage, int position) {
