@@ -9,6 +9,7 @@ import 'package:flutter_document_picker/flutter_document_picker.dart';
 import 'package:safe_write/write_pad.dart';
 import 'settings.dart';
 import 'passage.dart';
+import 'page_split.dart';
 
 import 'dart:io';
 import 'dart:convert';
@@ -334,7 +335,7 @@ class _ReaderState extends State<_Reader> {
   int _end = 0;
   List<int> _pageIndices = [];
   final List<List<int>> _pageStartPositions = [];
-  final List<List<int>> _runes = [];
+  final List<String> _runes = [];
 
   void _updateStartEnd() {
     final pageIndex = _pageIndices[_passage];
@@ -355,7 +356,8 @@ class _ReaderState extends State<_Reader> {
   void initState() {
     super.initState();
     for (int i = 0; i < widget.plaintext.passages.length; i++) {
-      _runes.add(widget.plaintext.passages[i].content.runes.toList());
+      // _runes.add(widget.plaintext.passages[i].content.runes.toList());
+      _runes.add(widget.plaintext.passages[i].content);
       var md5 =
           MD5().update(widget.plaintext.passages[i].content.codeUnits).digest();
       String key = hex.encode(md5);
@@ -379,80 +381,9 @@ class _ReaderState extends State<_Reader> {
     _updateStartEnd();
   }
 
-  double _computeTextHeight(List<int> text) {
-    final ts = TextSpan(
-        text: text.map((rune) => String.fromCharCode(rune)).join(),
-        style: widget._style);
-    final tp = TextPainter(text: ts, textDirection: TextDirection.ltr);
-    tp.layout(maxWidth: widget.textWidth);
-    return tp.height;
-  }
-
-  bool _isInWord(int codeunit) {
-    return (codeunit >= 0x41 && codeunit <= 0x41 + 25) ||
-        (codeunit >= 0x61 && codeunit <= 0x61 + 25) ||
-        (codeunit >= 0x30 && codeunit <= 0x39) ||
-        codeunit == 0x5f;
-  }
-
-  int _next(List<int> text, int pos) {
-    final length = text.length;
-    if (pos >= length - 1) return pos + 1;
-    if (!_isInWord(text[pos])) return pos + 1;
-    int i = pos + 1;
-    for (; i < text.length; i++) {
-      if (!_isInWord(text.elementAt(i))) return i;
-    }
-    return i;
-  }
-
-  int _nextLineBreak(List<int> text, int start) {
-    int i = _next(text, start);
-    if (i >= text.length) return i;
-    double standardHeight = _computeTextHeight(text.sublist(start, i));
-    while (i < text.length) {
-      final nexti = _next(text, i);
-      final nextheight = _computeTextHeight(text.sublist(start, nexti));
-      if (nextheight >= standardHeight * 1.5) {
-        break;
-      }
-      i = nexti;
-    }
-    return i;
-  }
-
-  int _nextPageBreak(List<int> text, int start) {
-    int i = start;
-    for (int j = 0; j < widget.textHeight ~/ 30; j++) {
-      i = _nextLineBreak(text, i);
-      if (i >= text.length) {
-        break;
-      }
-    }
-    return i;
-
-    // int i = _next(text, start);
-    // if (i >= text.length) return i;
-    // while (i < text.length) {
-    //   final nexti = _next(text, i);
-    //   final nextheight = _computeTextHeight(text.sublist(start, nexti));
-    //   if (nextheight >= widget.textHeight - 30) {
-    //     break;
-    //   }
-    //   i = nexti;
-    // }
-    // return i;
-  }
-
-  List<int> _breakPages(List<int> text) {
-    final ret = <int>[0];
-    int i = 0;
-    while (i < text.length) {
-      i = _nextPageBreak(text, i);
-      if (i < text.length) ret.add(i);
-      // print("Line breaking progress: $i/${text.length}");
-    }
-    return ret;
+  List<int> _breakPages(String text) {
+    return getSplittedText(
+        Size(widget.textWidth, widget.textHeight), widget._style, text);
   }
 
   int? locatePage(int passage, int position) {
