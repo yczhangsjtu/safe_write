@@ -486,7 +486,13 @@ class _ReaderState extends State<_Reader> {
           children: [
             GestureDetector(
               onTap: () {
-                _pageIndices[_passage] = max(0, _pageIndices[_passage] - 1);
+                if (_pageIndices[_passage] > 0) {
+                  _pageIndices[_passage] -= 1;
+                } else if (_passage > 0) {
+                  _passage -= 1;
+                  _pageIndices[_passage] =
+                      _pageStartPositions[_passage].length - 1;
+                }
                 setState(() {
                   _updateStartEnd();
                   _saveProgress();
@@ -528,9 +534,13 @@ class _ReaderState extends State<_Reader> {
             ),
             GestureDetector(
               onTap: () {
-                _pageIndices[_passage] = min(
-                    _pageStartPositions[_passage].length - 1,
-                    _pageIndices[_passage] + 1);
+                if (_pageIndices[_passage] <
+                    _pageStartPositions[_passage].length - 1) {
+                  _pageIndices[_passage] += 1;
+                } else if (_passage < _pageIndices.length - 1) {
+                  _passage += 1;
+                  _pageIndices[_passage] = 0;
+                }
                 setState(() {
                   _updateStartEnd();
                   _saveProgress();
