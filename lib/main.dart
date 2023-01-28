@@ -312,7 +312,7 @@ class _Reader extends StatefulWidget {
 
   _Reader(
       {Key? key,
-      double padding = 50,
+      double padding = 100,
       required this.path,
       required this.plaintext,
       required this.locations,
