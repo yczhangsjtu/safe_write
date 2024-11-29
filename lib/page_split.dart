@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/cupertino.dart';
 
 List<int> getSplittedText(Size pageSize, TextStyle textStyle, String text) {
